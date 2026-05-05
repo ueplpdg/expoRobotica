@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RoboProvi — Semana Cultural 2026</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════
+   ROOT & RESET
+═══════════════════════════════════════════════════════════ */
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --gold:#f5a623;--goldL:#ffd060;--goldD:#c47a00;
+  --navy:#050c1a;--navyM:#0b1830;--navyL:#132040;
+  --cyan:#00e5ff;--cyanD:#0099bb;
+  --green:#00e676;--red:#ff3d3d;--purple:#a855f7;
+  --text:#dde8ff;--textM:rgba(221,232,255,.65);--textL:rgba(221,232,255,.35);
+  --card:rgba(255,255,255,.04);--cardB:rgba(245,166,35,.15);
+  --gld-glow:rgba(245,166,35,.4);--cyn-glow:rgba(0,229,255,.35);
+}
+html,body{width:100vw;height:100vh;overflow:hidden;background:var(--navy);color:var(--text);font-family:'Rajdhani',sans-serif;cursor:none;user-select:none}
+
+/* ═══════════════════════════════════════════════════════════
+   LAYER STACK
+═══════════════════════════════════════════════════════════ */
+#bg-canvas{position:fixed;inset:0;z-index:0}
+#grid{
+  position:fixed;inset:0;z-index:1;
+  background-image:linear-gradient(rgba(245,166,35,.03) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(245,166,35,.03) 1px,transparent 1px);
+  background-size:44px 44px;
+}
+#vignette{position:fixed;inset:0;z-index:2;background:radial-gradient(ellipse at center,transparent 40%,rgba(5,12,26,.7) 100%)}
+#wipe{position:fixed;inset:0;z-index:90;background:var(--gold);transform:scaleX(0);transform-origin:left;pointer-events:none}
+
+/* ═══════════════════════════════════════════════════════════
+   SLIDES
+═══════════════════════════════════════════════════════════ */
+.slide{position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;opacity:0;transform:scale(.97);transition:opacity .6s,transform .6s;pointer-events:none}
+.slide.active{opacity:1;transform:scale(1);pointer-events:all}
+
+/* ═══════════════════════════════════════════════════════════
+   SHARED HEADER
+═══════════════════════════════════════════════════════════ */
+.hdr{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 32px;flex-shrink:0;
+  background:rgba(5,12,26,.9);backdrop-filter:blur(12px);
+  border-bottom:1px solid rgba(245,166,35,.12);
+}
+.hdr-logo{height:32px;opacity:.9;filter:drop-shadow(0 0 6px var(--gld-glow))}
+.hdr-center{font-family:'Orbitron',monospace;font-size:.65rem;color:var(--gold);letter-spacing:5px;text-transform:uppercase}
+.hdr-right{display:flex;align-items:center;gap:8px}
+.hdr-num{font-family:'Orbitron',monospace;font-size:.6rem;color:var(--textL);letter-spacing:2px}
+.slide-dots-h{display:flex;gap:5px}
+.sdot{width:5px;height:5px;border-radius:50%;background:var(--textL);transition:all .3s}
+.sdot.on{background:var(--gold);box-shadow:0 0 6px var(--gold)}
+
+/* PROGRESS STRIP */
+#prog{position:fixed;bottom:0;left:0;height:2px;z-index:100;background:linear-gradient(90deg,var(--gold),var(--cyan));width:0}
+
+/* ═══════════════════════════════════════════════════════════
+   SECTION LABELS
+═══════════════════════════════════════════════════════════ */
+.stitle{font-family:'Orbitron',monospace;font-weight:900;font-size:1.65rem;letter-spacing:3px;text-transform:uppercase;color:var(--gold);line-height:1}
+.stitle em{color:var(--cyan);font-style:normal}
+.sline{width:50px;height:3px;background:linear-gradient(90deg,var(--cyan),transparent);margin:6px 0 16px}
+
+/* CARDS */
+.card{background:var(--card);border:1px solid var(--cardB);border-radius:10px;padding:14px 16px;transition:all .3s}
+.card:hover{border-color:var(--gold);background:rgba(245,166,35,.06)}
+
+/* BADGES */
+.badge{display:inline-flex;align-items:center;gap:4px;font-family:'Orbitron',monospace;font-size:.55rem;padding:3px 10px;border-radius:20px;letter-spacing:1px;text-transform:uppercase;font-weight:700;margin-top:6px;margin-right:4px}
+.b-auto{background:rgba(0,229,255,.12);color:var(--cyan);border:1px solid rgba(0,229,255,.3)}
+.b-ir{background:rgba(245,166,35,.12);color:var(--gold);border:1px solid rgba(245,166,35,.3)}
+.b-sens{background:rgba(0,230,118,.12);color:var(--green);border:1px solid rgba(0,230,118,.3)}
+
+/* FADE ANIMS */
+@keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeLeft{from{opacity:0;transform:translateX(-24px)}to{opacity:1;transform:translateX(0)}}
+@keyframes fadeRight{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:translateX(0)}}
+@keyframes glow{0%,100%{text-shadow:0 0 20px var(--gld-glow)}50%{text-shadow:0 0 40px var(--goldL),0 0 80px var(--gld-glow)}}
+@keyframes pulse{0%,100%{box-shadow:0 0 10px var(--gld-glow)}50%{box-shadow:0 0 25px var(--gld-glow),0 0 50px rgba(245,166,35,.2)}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes scanDown{0%{top:-4px}100%{top:100%}}
+@keyframes drawLine{from{stroke-dashoffset:1000}to{stroke-dashoffset:0}}
+@keyframes flowDash{from{stroke-dashoffset:0}to{stroke-dashoffset:-40}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+@keyframes countUp{from{opacity:0;transform:scale(.5)}to{opacity:1;transform:scale(1)}}
+@keyframes typeIn{from{width:0}to{width:100%}}
+
+/* ═══════════════════════════════════════════════════════════
+   SLIDE 1 — PORTADA CINEMATICA
+═══════════════════════════════════════════════════════════ */
+#s1{align-items:center;justify-content:center;gap:0}
+.s1-wrap{display:flex;flex-direction:column;align-items:center;gap:18px;text-align:center;position:relative}
+
+.s1-logos{display:flex;align-items:center;gap:32px;animation:fadeUp .9s .1s both}
+.logo-prov{height:88px;filter:drop-shadow(0 0 24px var(--gld-glow));animation:float 4s ease-in-out infinite}
+.logo-sep{width:2px;height:64px;background:linear-gradient(to bottom,transparent,var(--gold),transparent)}
+.logo-robo{height:100px;filter:drop-shadow(0 0 24px var(--cyn-glow));animation:float 4s 1.2s ease-in-out infinite reverse}
+
+.s1-eyebrow{font-family:'Orbitron',monospace;font-size:.7rem;color:var(--cyan);letter-spacing:6px;text-transform:uppercase;animation:fadeUp .8s .3s both}
+
+.s1-title-wrap{animation:fadeUp .9s .45s both;position:relative;overflow:hidden}
+.s1-title{font-family:'Orbitron',monospace;font-weight:900;font-size:4rem;letter-spacing:4px;line-height:1;background:linear-gradient(135deg,var(--goldL),var(--gold),var(--goldD));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:glow 3s ease-in-out infinite}
+.s1-sub{font-family:'Orbitron',monospace;font-size:.95rem;color:var(--cyan);letter-spacing:7px;margin-top:6px}
+
+.s1-school{font-size:1rem;color:var(--textM);letter-spacing:2px;animation:fadeUp .8s .6s both}
+
+.s1-tag{display:inline-flex;align-items:center;gap:10px;font-family:'Orbitron',monospace;font-size:.72rem;color:var(--cyan);letter-spacing:2px;border:1px solid rgba(0,229,255,.25);border-radius:3px;padding:9px 24px;background:rgba(0,229,255,.04);animation:fadeUp .8s .75s both}
+
+.s1-stats{display:flex;animation:fadeUp .8s .9s both;border:1px solid rgba(245,166,35,.15);border-radius:8px;overflow:hidden;margin-top:4px}
+.stat{padding:14px 32px;text-align:center;border-right:1px solid rgba(245,166,35,.12)}
+.stat:last-child{border-right:none}
+.stat-n{font-family:'Orbitron',monospace;font-size:2rem;font-weight:900;color:var(--gold);text-shadow:0 0 20px var(--gld-glow)}
+.stat-l{font-size:.65rem;color:var(--textL);letter-spacing:2px;text-transform:uppercase;margin-top:2px}
+
+/* Gears */
+.gears{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:-1}
+.gear{position:absolute;opacity:.06}
+.g1{top:-80px;right:-80px;width:240px;animation:spin 28s linear infinite}
+.g2{bottom:-60px;left:-60px;width:190px;animation:spin 20s linear infinite reverse}
+.g3{top:40%;right:60px;width:90px;animation:spin 14s linear infinite}
+.g4{top:10%;left:80px;width:60px;animation:spin 10s linear infinite reverse}
+
+/* ═══════════════════════════════════════════════════════════
+   SLIDE 2 — BASE MECÁNICA
+═══════════════════════════════════════════════════════════ */
+#s2 .body{flex:1;display:flex;gap:28px;padding:16px 28px 24px;align-items:center}
+
+.mec-img-zone{flex:1.1;position:relative;display:flex;align-items:center;justify-content:center}
+.mec-img-zone img{max-width:100%;max-height:calc(100vh - 160px);object-fit:contain;filter:drop-shadow(0 0 30px rgba(245,166,35,.2));border-radius:12px}
+.scan-overlay{position:absolute;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,rgba(0,229,255,.5),transparent);animation:scanDown 3s linear infinite;pointer-events:none}
+
+.mec-panel{flex:1;display:flex;flex-direction:column;gap:12px;justify-content:center}
+.mec-card{display:flex;gap:12px;align-items:flex-start;opacity:0;transform:translateX(28px);transition:all .5s ease}
+.mec-card.in{opacity:1;transform:translateX(0)}
+.mec-icon{font-size:1.6rem;flex-shrink:0;width:36px;text-align:center}
+.mec-title{font-family:'Orbitron',monospace;font-size:.7rem;color:var(--gold);letter-spacing:2px;text-transform:uppercase;margin-bottom:4px}
+.mec-desc{font-size:.85rem;color:var(--textM);line-height:1.5}
+
+/* ═══════════════════════════════════════════════════════════
+   SLIDE 3 — LOS 3 ROBOTS
+═══════════════════════════════════════════════════════════ */
+#s3 .body{flex:1;display:flex;flex-direction:column;padding:10px 28px 22px;gap:10px}
+.rgb{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;flex:1}
+
+.rcard{background:var(--card);border:1px solid var(--cardB);border-radius:12px;display:flex;flex-direction:column;overflow:hidden;opacity:0;transform:translateY(32px);transition:opacity .55s,transform .55s;position:relative}
+.rcard.in{opacity:1;transform:translateY(0)}
+.rcard::before{content:'';position:absolute;inset:0;border-radius:12px;opacity:0;transition:opacity .3s;background:linear-gradient(135deg,rgba(245,166,35,.08),transparent)}
+.rcard:hover::before{opacity:1}
+.rcard:hover{border-color:rgba(245,166,35,.5);box-shadow:0 0 30px rgba(245,166,35,.12)}
+
+.rc-photo{flex:1;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.3);padding:10px;min-height:0;position:relative;overflow:hidden}
+.rc-photo img{max-width:100%;max-height:190px;object-fit:contain;filter:drop-shadow(0 0 16px rgba(245,166,35,.3));transition:transform .4s}
+.rcard:hover .rc-photo img{transform:scale(1.07)}
+.rc-scan{position:absolute;top:-4px;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,var(--cyan),transparent);animation:scanDown 2.5s linear infinite;opacity:0}
+.rcard.in .rc-scan{opacity:.7}
+
+.rc-body{padding:12px 14px;background:rgba(5,12,26,.8);border-top:1px solid var(--cardB)}
+.rc-n{font-family:'Orbitron',monospace;font-size:.58rem;color:var(--cyan);letter-spacing:3px;text-transform:uppercase;margin-bottom:4px}
+.rc-name{font-family:'Orbitron',monospace;font-size:.88rem;font-weight:700;color:var(--gold);margin-bottom:6px}
+.rc-desc{font-size:.77rem;color:var(--textM);line-height:1.55}
+
+/* ═══════════════════════════════════════════════════════════
+   SLIDE 4 — ELECTRÓNICA
+═══════════════════════════════════════════════════════════ */
+#s4 .body{flex:1;display:flex;gap:24px;padding:14px 28px 22px}
+
+.circ-zone{flex:1.2;display:flex;flex-direction:column;gap:12px;justify-content:center}
+#circuit-svg{width:100%;max-height:360px}
+
+.comp-box{cursor:default;transition:all .4s}
+.comp-box rect{stroke-width:1.5;fill-opacity:.12;transition:all .4s}
+.comp-box text{transition:all .4s}
+.comp-box.lit rect{fill-opacity:.4;filter:url(#glow)}
+.comp-box.lit .comp-label{fill:white}
+
+.flow-path{stroke-dasharray:8 6;stroke-dashoffset:0;animation:flowDash 1s linear infinite;opacity:0;transition:opacity .4s}
+.flow-path.on{opacity:1}
+
+.elec-list{flex:1;display:flex;flex-direction:column;gap:10px;justify-content:center}
+.el-row{display:flex;gap:12px;align-items:flex-start;padding:11px 14px;background:var(--card);border-radius:7px;border-left:3px solid var(--gold);opacity:0;transform:translateX(20px);transition:all .45s}
+.el-row.in{opacity:1;transform:translateX(0)}
+.el-key{font-family:'Orbitron',monospace;font-size:.6rem;color:var(--gold);letter-spacing:1px;white-space:nowrap;padding-top:2px}
+.el-val{font-size:.8rem;color:var(--textM);line-height:1.55}
+
+/* ═══════════════════════════════════════════════════════════
+   SLIDE 5 — CÓDIGO EN ACCIÓN
+═══════════════════════════════════════════════════════════ */
+#s5 .body{flex:1;display:flex;gap:18px;padding:10px 28px 18px;align-items:stretch}
+
+/* LEFT: visual blocks */
+.blk-col{flex:1;display:flex;flex-direction:column;gap:8px}
+.blk-head{font-family:'Orbitron',monospace;font-size:.62rem;color:var(--cyan);letter-spacing:3px;text-transform:uppercase;padding:6px 0;border-bottom:1px solid rgba(0,229,255,.18);margin-bottom:4px}
+
+.vb{display:flex;align-items:center;gap:10px;border-radius:7px;padding:8px 12px;border:2px solid transparent;transition:all .35s;opacity:.22;position:relative;cursor:default}
+.vb.on{opacity:1}
+.vb::after{content:'▶';position:absolute;right:-18px;top:50%;transform:translateY(-50%);font-size:.8rem;opacity:0;color:var(--gold);transition:opacity .3s}
+.vb.on::after{opacity:1}
+
+.vb0{background:rgba(88,88,255,.15);border-color:#5858ff}.vb0.on{box-shadow:0 0 12px rgba(88,88,255,.35)}
+.vb1{background:rgba(0,180,180,.15);border-color:#00b4b4}.vb1.on{box-shadow:0 0 12px rgba(0,180,180,.35)}
+.vb2{background:rgba(255,160,0,.15);border-color:#ffa000}.vb2.on{box-shadow:0 0 12px rgba(255,160,0,.35)}
+.vb3{background:rgba(255,60,60,.15);border-color:#ff3c3c}.vb3.on{box-shadow:0 0 12px rgba(255,60,60,.35)}
+.vb4{background:rgba(168,85,247,.15);border-color:#a855f7}.vb4.on{box-shadow:0 0 12px rgba(168,85,247,.35)}
+.vb5{background:rgba(0,200,80,.15);border-color:#00c850}.vb5.on{box-shadow:0 0 12px rgba(0,200,80,.35)}
+
+.vb-ico{font-size:1.3rem;flex-shrink:0;width:28px}
+.vb-txt{font-size:.88rem;font-weight:700;color:var(--text)}
+.vb-sub{font-size:.67rem;color:var(--textL);margin-top:2px}
+
+/* CENTER: rail + robot sim */
+.center-col{width:180px;flex-shrink:0;display:flex;flex-direction:column;gap:8px;align-items:center}
+.sim-label{font-family:'Orbitron',monospace;font-size:.55rem;color:var(--cyan);letter-spacing:2px;text-transform:uppercase;text-align:center}
+#robot-canvas{border:1px solid rgba(245,166,35,.2);border-radius:8px;background:rgba(5,12,26,.9);display:block}
+.sim-status{font-family:'Orbitron',monospace;font-size:.6rem;text-align:center;letter-spacing:1px;padding:4px 10px;border-radius:4px;background:rgba(0,0,0,.4);border:1px solid rgba(245,166,35,.2);min-height:24px;transition:all .3s}
+
+/* Rail */
+.rail-wrap{flex:1;position:relative;width:2px;align-self:stretch}
+.rail-line{position:absolute;left:0;top:0;bottom:0;width:2px;background:linear-gradient(to bottom,transparent,rgba(245,166,35,.35),transparent)}
+.rail-dot{position:absolute;width:10px;height:10px;border-radius:50%;background:var(--gold);left:-4px;top:0;box-shadow:0 0 10px var(--gold);transition:top .4s cubic-bezier(.4,0,.2,1)}
+
+/* RIGHT: code */
+.code-col{flex:1;display:flex;flex-direction:column;gap:8px}
+.code-head{font-family:'Orbitron',monospace;font-size:.62rem;color:var(--gold);letter-spacing:3px;text-transform:uppercase;padding:6px 0;border-bottom:1px solid rgba(245,166,35,.18);margin-bottom:4px}
+.cb{background:rgba(3,8,18,.95);border:1px solid rgba(255,255,255,.06);border-left:3px solid transparent;border-radius:7px;padding:9px 12px;font-family:'Courier New',monospace;font-size:.75rem;line-height:1.7;transition:all .35s;opacity:.12}
+.cb.on{opacity:1;border-left-color:var(--gold);background:rgba(245,166,35,.04)}
+.kw{color:#7dd3fc}.fn{color:#fde68a}.num{color:#a3e635}.cm{color:#4ade80;opacity:.7}.vr{color:#93c5fd}.op{color:#d4d4d4}.str{color:#fca5a5}
+
+/* ═══════════════════════════════════════════════════════════
+   SLIDE 6 — CIERRE
+═══════════════════════════════════════════════════════════ */
+#s6{align-items:center;justify-content:center;text-align:center;gap:24px}
+.s6-ring{width:180px;height:180px;position:relative;animation:fadeUp .8s .2s both}
+.s6-ring svg{width:100%;height:100%;animation:spin 12s linear infinite}
+.s6-inner{position:absolute;inset:20px;border-radius:50%;background:rgba(245,166,35,.08);border:2px solid rgba(245,166,35,.2);display:flex;align-items:center;justify-content:center;flex-direction:column}
+.s6-pct{font-family:'Orbitron',monospace;font-size:1.4rem;font-weight:900;color:var(--gold)}
+.s6-lbl{font-size:.6rem;color:var(--textL);letter-spacing:2px}
+.s6-msg{font-family:'Orbitron',monospace;font-size:2.2rem;font-weight:900;color:var(--gold);animation:fadeUp .8s .4s both,glow 3s .4s ease-in-out infinite}
+.s6-sub{font-size:1.1rem;color:var(--textM);letter-spacing:2px;animation:fadeUp .8s .6s both}
+.s6-logos{display:flex;align-items:center;gap:24px;animation:fadeUp .8s .8s both}
+.s6-logos img{height:60px;opacity:.8;filter:drop-shadow(0 0 10px var(--gld-glow))}
+.s6-loop{font-family:'Orbitron',monospace;font-size:.65rem;color:var(--textL);letter-spacing:3px;animation:blink 2s ease-in-out infinite}
+</style>
+</head>
+<body>
+
+<!-- Background layers -->
+<canvas id="bg-canvas"></canvas>
+<div id="grid"></div>
+<div id="vignette"></div>
+<div id="wipe"></div>
+<div id="prog"></div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SLIDE 1 — PORTADA
+═══════════════════════════════════════════════════════════ -->
+<div class="slide active" id="s1">
+  <div class="s1-wrap">
+    <div class="gears">
+      <svg class="gear g1" viewBox="0 0 100 100" fill="var(--gold)"><path d="M43.3 5.4l-1.5 6.3A35 35 0 0 0 32 15.6L26 12.7l-9.3 9.3 2.9 6A35 35 0 0 0 15.7 38l-6.3 1.5v13.1l6.3 1.5A35 35 0 0 0 19.6 64l-2.9 6 9.3 9.3 6-2.9A35 35 0 0 0 42 80.3l1.5 6.3h13.1l1.5-6.3A35 35 0 0 0 68 76.4l6 2.9 9.3-9.3-2.9-6A35 35 0 0 0 84.3 54l6.3-1.5V39.4L84.3 38A35 35 0 0 0 80.4 28l2.9-6-9.3-9.3-6 2.9A35 35 0 0 0 58 11.7L56.4 5.4H43.3zm6.7 22A22.6 22.6 0 1 1 27.4 50 22.6 22.6 0 0 1 50 27.4z"/></svg>
+      <svg class="gear g2" viewBox="0 0 100 100" fill="var(--gold)"><path d="M43.3 5.4l-1.5 6.3A35 35 0 0 0 32 15.6L26 12.7l-9.3 9.3 2.9 6A35 35 0 0 0 15.7 38l-6.3 1.5v13.1l6.3 1.5A35 35 0 0 0 19.6 64l-2.9 6 9.3 9.3 6-2.9A35 35 0 0 0 42 80.3l1.5 6.3h13.1l1.5-6.3A35 35 0 0 0 68 76.4l6 2.9 9.3-9.3-2.9-6A35 35 0 0 0 84.3 54l6.3-1.5V39.4L84.3 38A35 35 0 0 0 80.4 28l2.9-6-9.3-9.3-6 2.9A35 35 0 0 0 58 11.7L56.4 5.4H43.3zm6.7 22A22.6 22.6 0 1 1 27.4 50 22.6 22.6 0 0 1 50 27.4z"/></svg>
+      <svg class="gear g3" viewBox="0 0 100 100" fill="var(--gold)"><path d="M43.3 5.4l-1.5 6.3A35 35 0 0 0 32 15.6L26 12.7l-9.3 9.3 2.9 6A35 35 0 0 0 15.7 38l-6.3 1.5v13.1l6.3 1.5A35 35 0 0 0 19.6 64l-2.9 6 9.3 9.3 6-2.9A35 35 0 0 0 42 80.3l1.5 6.3h13.1l1.5-6.3A35 35 0 0 0 68 76.4l6 2.9 9.3-9.3-2.9-6A35 35 0 0 0 84.3 54l6.3-1.5V39.4L84.3 38A35 35 0 0 0 80.4 28l2.9-6-9.3-9.3-6 2.9A35 35 0 0 0 58 11.7L56.4 5.4H43.3zm6.7 22A22.6 22.6 0 1 1 27.4 50 22.6 22.6 0 0 1 50 27.4z"/></svg>
+      <svg class="gear g4" viewBox="0 0 100 100" fill="var(--gold)"><path d="M43.3 5.4l-1.5 6.3A35 35 0 0 0 32 15.6L26 12.7l-9.3 9.3 2.9 6A35 35 0 0 0 15.7 38l-6.3 1.5v13.1l6.3 1.5A35 35 0 0 0 19.6 64l-2.9 6 9.3 9.3 6-2.9A35 35 0 0 0 42 80.3l1.5 6.3h13.1l1.5-6.3A35 35 0 0 0 68 76.4l6 2.9 9.3-9.3-2.9-6A35 35 0 0 0 84.3 54l6.3-1.5V39.4L84.3 38A35 35 0 0 0 80.4 28l2.9-6-9.3-9.3-6 2.9A35 35 0 0 0 58 11.7L56.4 5.4H43.3zm6.7 22A22.6 22.6 0 1 1 27.4 50 22.6 22.6 0 0 1 50 27.4z"/></svg>
+    </div>
+
+    <div class="s1-logos">
+      <img src="LogoOficial_Providencia_Azogues.png" class="logo-prov" alt="La Providencia">
+      <div class="logo-sep"></div>
+      <img src="logoRobotica77.png" class="logo-robo" alt="RoboProvi">
+    </div>
+
+    <div class="s1-eyebrow">⬥ Semana Cultural 2026 ⬥</div>
+
+    <div class="s1-title-wrap">
+      <div class="s1-title">Expo Robótica Provi</div>
+      <div class="s1-sub">Laboratorio de Robótica Educativa</div>
+    </div>
+
+    <div class="s1-school">Unidad Educativa Particular "La Providencia" · Azogues, Ecuador</div>
+    <div class="s1-tag">⚙ Robótica &nbsp;·&nbsp; Programación &nbsp;·&nbsp; Electrónica &nbsp;·&nbsp; Mecatrónica ⚙</div>
+
+    <div class="s1-stats">
+      <div class="stat"><div class="stat-n" id="sn1">3</div><div class="stat-l">Robots</div></div>
+      <div class="stat"><div class="stat-n">4</div><div class="stat-l">Ruedas</div></div>
+      <div class="stat"><div class="stat-n">2</div><div class="stat-l">Motores DC</div></div>
+      <div class="stat"><div class="stat-n">1</div><div class="stat-l">Arduino UNO</div></div>
+      <div class="stat"><div class="stat-n">∞</div><div class="stat-l">Posibilidades</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SLIDE 2 — BASE MECÁNICA
+═══════════════════════════════════════════════════════════ -->
+<div class="slide" id="s2">
+  <div class="hdr">
+    <img src="logoRobotica77.png" class="hdr-logo" alt="">
+    <div class="hdr-center">Base Mecánica Compartida</div>
+    <div class="hdr-right">
+      <div class="hdr-num">02/06</div>
+      <div class="slide-dots-h" id="dots2"></div>
+    </div>
+  </div>
+  <div class="body">
+    <div class="mec-img-zone">
+      <div class="scan-overlay"></div>
+      <img src="Base_sola.PNG" alt="Chasis base">
+    </div>
+    <div class="mec-panel">
+      <div><div class="stitle">Base <em>Mecánica</em></div><div class="sline"></div></div>
+      <div class="mec-card card" data-d="150"><span class="mec-icon">🔩</span><div><div class="mec-title">Chasis Modular</div><div class="mec-desc">Estructura ensamblada con el kit ExploraRobótica. Rígida y ligera. La misma base soporta 3 configuraciones distintas.</div></div></div>
+      <div class="mec-card card" data-d="300"><span class="mec-icon">⚙️</span><div><div class="mec-title">2 Motores DC</div><div class="mec-desc">Tracción diferencial: cada motor controla un lado de forma independiente. Distintas velocidades = giro controlado.</div></div></div>
+      <div class="mec-card card" data-d="450"><span class="mec-icon">🛞</span><div><div class="mec-title">4 Ruedas</div><div class="mec-desc">2 ruedas motrices + 2 ruedas libres de apoyo. Sistema diferencial que permite girar sin necesidad de dirección.</div></div></div>
+      <div class="mec-card card" data-d="600"><span class="mec-icon">🔄</span><div><div class="mec-title">Tracción Diferencial</div><div class="mec-desc"><strong style="color:var(--green)">Adelante:</strong> ambos motores igual velocidad &nbsp;·&nbsp; <strong style="color:var(--cyan)">Giro:</strong> un motor más rápido &nbsp;·&nbsp; <strong style="color:var(--gold)">Pivote:</strong> motores opuestos.</div></div></div>
+      <div class="mec-card card" data-d="750"><span class="mec-icon">🦾</span><div><div class="mec-title">Efector Intercambiable</div><div class="mec-desc">La misma base soporta: <em style="color:var(--gold)">pinza robótica</em> · <em style="color:var(--cyan)">sistema levantacargas</em> · <em style="color:var(--green)">sensor ultrasónico</em>.</div></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SLIDE 3 — LOS 3 ROBOTS
+═══════════════════════════════════════════════════════════ -->
+<div class="slide" id="s3">
+  <div class="hdr">
+    <img src="logoRobotica77.png" class="hdr-logo" alt="">
+    <div class="hdr-center">Los 3 Robots</div>
+    <div class="hdr-right"><div class="hdr-num">03/06</div><div class="slide-dots-h" id="dots3"></div></div>
+  </div>
+  <div class="body" style="flex:1;display:flex;flex-direction:column;padding:10px 28px 20px;gap:10px">
+    <div><div class="stitle">Tres <em>Misiones</em> — Una Base</div><div class="sline"></div></div>
+    <div class="rgb">
+
+      <div class="rcard">
+        <div class="rc-photo"><div class="rc-scan"></div><img src="base_con_pinza.PNG" alt="Pinza"></div>
+        <div class="rc-body">
+          <div class="rc-n">Robot 01</div>
+          <div class="rc-name">🦾 Pinza Robótica</div>
+          <div class="rc-desc">Control remoto IR para mando manual. Servomotor 9g abre y cierra la pinza con precisión. Modo autónomo: recorre trayectoria en L transportando objetos de extremo a extremo de forma repetida.</div>
+          <span class="badge b-ir">📱 Control IR</span><span class="badge b-auto">🤖 Autónomo</span>
+        </div>
+      </div>
+
+      <div class="rcard">
+        <div class="rc-photo"><div class="rc-scan"></div><img src="base_con_levantacargas.PNG" alt="Levantacargas"></div>
+        <div class="rc-body">
+          <div class="rc-n">Robot 02</div>
+          <div class="rc-name">🏗 Levantacargas</div>
+          <div class="rc-desc">Sistema de cuerda, polea y horquilla accionado por servomotor. Levanta y baja cargas automáticamente. Opera en bucle autónomo por la trayectoria en L cargando y descargando objetos.</div>
+          <span class="badge b-auto">🤖 100% Autónomo</span>
+        </div>
+      </div>
+
+      <div class="rcard">
+        <div class="rc-photo"><div class="rc-scan"></div><img src="base_con_sensor.png" alt="Sensor"></div>
+        <div class="rc-body">
+          <div class="rc-n">Robot 03</div>
+          <div class="rc-name">📡 Evasor de Obstáculos</div>
+          <div class="rc-desc">Sensor ultrasónico HC-SR04 mide distancias en tiempo real. Navega laberintos de cartón sin chocar: detecta obstáculo → retrocede → evalúa derecha e izquierda → elige el camino libre.</div>
+          <span class="badge b-sens">📡 HC-SR04</span><span class="badge b-auto">🤖 Autónomo</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SLIDE 4 — ELECTRÓNICA
+═══════════════════════════════════════════════════════════ -->
+<div class="slide" id="s4">
+  <div class="hdr">
+    <img src="logoRobotica77.png" class="hdr-logo" alt="">
+    <div class="hdr-center">Sistema Electrónico</div>
+    <div class="hdr-right"><div class="hdr-num">04/06</div><div class="slide-dots-h" id="dots4"></div></div>
+  </div>
+  <div class="body">
+    <div class="circ-zone">
+      <div><div class="stitle"><em>Circuito</em> Electrónico</div><div class="sline"></div></div>
+      <svg id="circuit-svg" viewBox="0 0 440 300" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <filter id="glow"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+          <filter id="glow2"><feGaussianBlur stdDeviation="5" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        </defs>
+
+        <!-- Wires (paths) -->
+        <!-- Battery to Arduino -->
+        <path id="w-ba" d="M 70 150 L 145 150" stroke="#64dc64" stroke-width="2" fill="none" class="flow-path" stroke-dasharray="6 5"/>
+        <!-- Arduino to L293D -->
+        <path id="w-al" d="M 220 150 L 280 150" stroke="#f5a623" stroke-width="2" fill="none" class="flow-path" stroke-dasharray="6 5"/>
+        <!-- L293D to Motor A -->
+        <path id="w-ma" d="M 320 130 L 320 90 L 390 90" stroke="#f5a623" stroke-width="2" fill="none" class="flow-path" stroke-dasharray="6 5"/>
+        <!-- L293D to Motor B -->
+        <path id="w-mb" d="M 320 170 L 320 210 L 390 210" stroke="#f5a623" stroke-width="2" fill="none" class="flow-path" stroke-dasharray="6 5"/>
+        <!-- Arduino to Sensor -->
+        <path id="w-as" d="M 182 120 L 182 60 L 260 60" stroke="#00e5ff" stroke-width="2" fill="none" class="flow-path" stroke-dasharray="6 5"/>
+        <!-- Arduino to Servo -->
+        <path id="w-av" d="M 182 180 L 182 250 L 260 250" stroke="#a855f7" stroke-width="2" fill="none" class="flow-path" stroke-dasharray="6 5"/>
+
+        <!-- Battery -->
+        <g class="comp-box" id="cb-bat" data-g="0">
+          <rect x="10" y="118" width="58" height="64" rx="6" stroke="#64dc64" fill="#64dc64"/>
+          <text x="39" y="143" text-anchor="middle" font-size="18" fill="white">🔋</text>
+          <text x="39" y="162" text-anchor="middle" font-size="8" class="comp-label" fill="#64dc64" font-family="monospace" font-weight="bold">PILAS</text>
+          <text x="39" y="173" text-anchor="middle" font-size="7" fill="#64dc64" font-family="monospace">9V · 6×AA</text>
+        </g>
+
+        <!-- Arduino -->
+        <g class="comp-box" id="cb-ard" data-g="0">
+          <rect x="145" y="108" width="75" height="84" rx="6" stroke="#1a6ade" fill="#1a6ade"/>
+          <text x="182" y="135" text-anchor="middle" font-size="20" fill="white">🟦</text>
+          <text x="182" y="157" text-anchor="middle" font-size="8" class="comp-label" fill="#1a6ade" font-family="monospace" font-weight="bold">ARDUINO</text>
+          <text x="182" y="168" text-anchor="middle" font-size="7" fill="#1a6ade" font-family="monospace">UNO · CEREBRO</text>
+          <text x="182" y="179" text-anchor="middle" font-size="7" fill="#1a6ade" font-family="monospace">14 pines I/O</text>
+        </g>
+
+        <!-- L293D -->
+        <g class="comp-box" id="cb-drv" data-g="1">
+          <rect x="280" y="118" width="72" height="64" rx="6" stroke="#dc3232" fill="#dc3232"/>
+          <text x="316" y="143" text-anchor="middle" font-size="18" fill="white">🔴</text>
+          <text x="316" y="162" text-anchor="middle" font-size="8" class="comp-label" fill="#dc3232" font-family="monospace" font-weight="bold">L293D</text>
+          <text x="316" y="173" text-anchor="middle" font-size="7" fill="#dc3232" font-family="monospace">Driver · Puente H</text>
+        </g>
+
+        <!-- Motor A -->
+        <g class="comp-box" id="cb-ma" data-g="2">
+          <rect x="390" y="68" width="44" height="44" rx="6" stroke="#f5a623" fill="#f5a623"/>
+          <text x="412" y="88" text-anchor="middle" font-size="14" fill="white">⚙</text>
+          <text x="412" y="103" text-anchor="middle" font-size="7" class="comp-label" fill="#f5a623" font-family="monospace" font-weight="bold">MOTOR A</text>
+        </g>
+
+        <!-- Motor B -->
+        <g class="comp-box" id="cb-mb" data-g="2">
+          <rect x="390" y="188" width="44" height="44" rx="6" stroke="#f5a623" fill="#f5a623"/>
+          <text x="412" y="208" text-anchor="middle" font-size="14" fill="white">⚙</text>
+          <text x="412" y="223" text-anchor="middle" font-size="7" class="comp-label" fill="#f5a623" font-family="monospace" font-weight="bold">MOTOR B</text>
+        </g>
+
+        <!-- Sensor HC-SR04 -->
+        <g class="comp-box" id="cb-sen" data-g="3">
+          <rect x="260" y="35" width="72" height="44" rx="6" stroke="#00e5ff" fill="#00e5ff"/>
+          <text x="296" y="55" text-anchor="middle" font-size="14" fill="white">📡</text>
+          <text x="296" y="70" text-anchor="middle" font-size="7" class="comp-label" fill="#00e5ff" font-family="monospace" font-weight="bold">HC-SR04</text>
+        </g>
+
+        <!-- Servo -->
+        <g class="comp-box" id="cb-srv" data-g="4">
+          <rect x="260" y="228" width="72" height="44" rx="6" stroke="#a855f7" fill="#a855f7"/>
+          <text x="296" y="248" text-anchor="middle" font-size="14" fill="white">🔧</text>
+          <text x="296" y="263" text-anchor="middle" font-size="7" class="comp-label" fill="#a855f7" font-family="monospace" font-weight="bold">SERVO 9G</text>
+        </g>
+
+        <!-- Labels on wires -->
+        <text id="lbl-ba" x="100" y="143" text-anchor="middle" font-size="7" fill="#64dc64" font-family="monospace" opacity="0">9V</text>
+        <text id="lbl-al" x="250" y="143" text-anchor="middle" font-size="7" fill="#f5a623" font-family="monospace" opacity="0">PWM</text>
+        <text id="lbl-as" x="222" y="53" text-anchor="middle" font-size="7" fill="#00e5ff" font-family="monospace" opacity="0">TRIG/ECHO</text>
+        <text id="lbl-av" x="222" y="267" text-anchor="middle" font-size="7" fill="#a855f7" font-family="monospace" opacity="0">PWM signal</text>
+      </svg>
+    </div>
+
+    <div class="elec-list">
+      <div class="el-row" data-d="0"><div class="el-key">PILAS</div><div class="el-val">6 pilas AA en serie → 9V. Alimentan el Arduino por el jack barrel. Los motores también toman corriente directamente desde aquí.</div></div>
+      <div class="el-row" data-d="200"><div class="el-key">ARDUINO</div><div class="el-val">El cerebro. Ejecuta el código a 16MHz. Lee sensores, calcula distancias, decide movimientos y controla todos los actuadores.</div></div>
+      <div class="el-row" data-d="400"><div class="el-key">L293D</div><div class="el-val">Puente H integrado. Amplifica la señal del Arduino (5V → potencia completa). Controla la dirección y velocidad (PWM) de 2 motores DC.</div></div>
+      <div class="el-row" data-d="600"><div class="el-key">HC-SR04</div><div class="el-val">Emite 8 pulsos ultrasónicos a 40kHz, mide el tiempo de rebote. Fórmula: distancia = tiempo × 0.0343 / 2. Rango: 2cm – 400cm.</div></div>
+      <div class="el-row" data-d="800"><div class="el-key">SERVO 9G</div><div class="el-val">Motor de posición controlada por señal PWM. Gira exactamente de 0° a 180°. Acciona la pinza o el sistema de poleas del levantacargas.</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SLIDE 5 — CÓDIGO EN ACCIÓN
+═══════════════════════════════════════════════════════════ -->
+<div class="slide" id="s5">
+  <div class="hdr">
+    <img src="logoRobotica77.png" class="hdr-logo" alt="">
+    <div class="hdr-center">Programación en Acción — Robot Evasor</div>
+    <div class="hdr-right"><div class="hdr-num">05/06</div><div class="slide-dots-h" id="dots5"></div></div>
+  </div>
+  <div class="body">
+
+    <!-- Visual blocks -->
+    <div class="blk-col">
+      <div class="blk-head">🧩 ¿Qué hace el robot?</div>
+      <div class="vb vb0" id="v0"><span class="vb-ico">⚙️</span><div><div class="vb-txt">INICIALIZAR</div><div class="vb-sub">Configura pines · espera 1.5s</div></div></div>
+      <div class="vb vb1" id="v1"><span class="vb-ico">📡</span><div><div class="vb-txt">MEDIR DISTANCIA</div><div class="vb-sub">Pulso ultrasónico → distancia en cm</div></div></div>
+      <div class="vb vb2" id="v2"><span class="vb-ico">❓</span><div><div class="vb-txt">¿OBSTÁCULO CERCA?</div><div class="vb-sub">Compara distancia con umbral 12cm</div></div></div>
+      <div class="vb vb3" id="v3"><span class="vb-ico">⬅️</span><div><div class="vb-txt">RETROCEDER</div><div class="vb-sub">Motores reversa · rampa suave · 480ms</div></div></div>
+      <div class="vb vb4" id="v4"><span class="vb-ico">🔄</span><div><div class="vb-txt">GIRAR Y EVALUAR</div><div class="vb-sub">Prueba der → izq → elige camino libre</div></div></div>
+      <div class="vb vb5" id="v5"><span class="vb-ico">➡️</span><div><div class="vb-txt">AVANZAR LIBRE</div><div class="vb-sub">Motores adelante · vuelve a medir</div></div></div>
+    </div>
+
+    <!-- Center: simulation + rail -->
+    <div class="center-col">
+      <div class="sim-label">Simulación en Vivo</div>
+      <canvas id="robot-canvas" width="160" height="160"></canvas>
+      <div class="sim-status" id="sim-status" style="color:var(--green)">LISTO</div>
+      <div style="flex:1;position:relative;width:2px;margin:4px auto">
+        <div class="rail-line"></div>
+        <div class="rail-dot" id="rdot"></div>
+      </div>
+    </div>
+
+    <!-- Code blocks -->
+    <div class="code-col">
+      <div class="code-head">&lt;/&gt; Código Arduino (C++)</div>
+      <div class="cb" id="c0"><span class="kw">void</span> <span class="fn">setup</span>() {<br>&nbsp;&nbsp;<span class="fn">pinMode</span>(<span class="vr">TRIG</span>, <span class="str">OUTPUT</span>); <span class="fn">pinMode</span>(<span class="vr">ECHO</span>, <span class="str">INPUT</span>);<br>&nbsp;&nbsp;<span class="fn">detener</span>();&nbsp;&nbsp;<span class="cm">// motores apagados</span><br>&nbsp;&nbsp;<span class="fn">delay</span>(<span class="num">1500</span>); <span class="cm">// pausa inicial</span><br>}</div>
+      <div class="cb" id="c1"><span class="kw">long</span> <span class="vr">dist</span> = <span class="fn">medirDistancia</span>();<br><span class="cm">// Pulso 10µs → pulseIn → tiempo (µs)</span><br><span class="cm">// dist = duracion × 0.0343 / 2 (cm)</span></div>
+      <div class="cb" id="c2"><span class="kw">if</span> (<span class="vr">dist</span> <span class="op">&lt;</span> <span class="num">12</span>) {&nbsp;<span class="cm">// ¡Obstáculo!</span><br>&nbsp;&nbsp;<span class="fn">maniobra</span>();<br>} <span class="kw">else if</span> (<span class="vr">dist</span> <span class="op">&lt;</span> <span class="num">20</span>) {<br>&nbsp;&nbsp;<span class="fn">setMotores</span>(<span class="num">1</span>,<span class="num">1</span>,<span class="num">115</span>); <span class="cm">// precaución</span><br>}</div>
+      <div class="cb" id="c3"><span class="fn">setMotores</span>(<span class="op">-</span><span class="num">1</span>,<span class="op">-</span><span class="num">1</span>,<span class="num">155</span>); <span class="cm">// reversa</span><br><span class="fn">delay</span>(<span class="num">480</span>);<br><span class="fn">frenar</span>(); <span class="cm">// freno suave</span></div>
+      <div class="cb" id="c4"><span class="fn">setMotores</span>(<span class="num">1</span>,<span class="op">-</span><span class="num">1</span>,<span class="num">150</span>); <span class="cm">// gira der</span><br><span class="fn">delay</span>(<span class="vr">T_GIRO_90</span>);<br><span class="kw">long</span> <span class="vr">dDer</span> = <span class="fn">medirDistancia</span>();<br><span class="kw">if</span>(<span class="vr">dDer</span> <span class="op">&gt;</span> <span class="num">30</span>) <span class="kw">return</span>; <span class="cm">// libre!</span></div>
+      <div class="cb" id="c5"><span class="fn">acelerar</span>(<span class="num">1</span>, <span class="num">1</span>, <span class="vr">VEL_LIBRE</span>);<br><span class="cm">// Rampa suave: 75→175 en ~200ms</span><br><span class="cm">// ↺ loop() → medir de nuevo...</span></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SLIDE 6 — CIERRE
+═══════════════════════════════════════════════════════════ -->
+<div class="slide" id="s6">
+  <div class="s6-ring">
+    <svg viewBox="0 0 100 100">
+      <circle cx="50" cy="50" r="44" fill="none" stroke="rgba(245,166,35,.15)" stroke-width="3"/>
+      <circle cx="50" cy="50" r="44" fill="none" stroke="var(--gold)" stroke-width="3" stroke-dasharray="12 8" stroke-linecap="round"/>
+      <circle cx="50" cy="50" r="36" fill="none" stroke="rgba(0,229,255,.2)" stroke-width="1.5" stroke-dasharray="6 10" stroke-linecap="round"/>
+    </svg>
+    <div class="s6-inner">
+      <img src="logoRobotica77.png" style="height:52px;filter:drop-shadow(0 0 12px var(--gld-glow))" alt="">
+    </div>
+  </div>
+  <div class="s6-msg">¡Misión Cumplida!</div>
+  <div class="s6-sub">Gracias por visitar el Laboratorio de Robótica</div>
+  <div class="s6-logos">
+    <img src="LogoOficial_Providencia_Azogues.png" alt="">
+    <div style="width:1px;height:50px;background:linear-gradient(to bottom,transparent,var(--gold),transparent)"></div>
+    <img src="logoRobotica77.png" alt="">
+  </div>
+  <div style="font-size:.85rem;color:var(--textM);animation:fadeUp .8s 1s both;letter-spacing:1px">Unidad Educativa Particular "La Providencia" · Azogues · 2026</div>
+  <div class="s6-loop">↺ Reiniciando presentación...</div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════
+   CANVAS BACKGROUND — Particle Network
+═══════════════════════════════════════════════════════════ */
+const bgC = document.getElementById('bg-canvas');
+const bgCtx = bgC.getContext('2d');
+function resizeBG(){bgC.width=window.innerWidth;bgC.height=window.innerHeight}
+resizeBG();
+window.addEventListener('resize',resizeBG);
+
+const NODES=[];
+const NODE_COUNT=55;
+const MAX_DIST=130;
+
+for(let i=0;i<NODE_COUNT;i++){
+  NODES.push({
+    x:Math.random()*window.innerWidth,
+    y:Math.random()*window.innerHeight,
+    vx:(Math.random()-.5)*.3,
+    vy:(Math.random()-.5)*.3,
+    r:1+Math.random()*2,
+    hue:Math.random()<.7?42:185
+  });
+}
+
+function drawBG(){
+  bgCtx.clearRect(0,0,bgC.width,bgC.height);
+  for(let i=0;i<NODES.length;i++){
+    const n=NODES[i];
+    n.x+=n.vx; n.y+=n.vy;
+    if(n.x<0||n.x>bgC.width)n.vx*=-1;
+    if(n.y<0||n.y>bgC.height)n.vy*=-1;
+    for(let j=i+1;j<NODES.length;j++){
+      const m=NODES[j];
+      const dx=n.x-m.x,dy=n.y-m.y;
+      const d=Math.sqrt(dx*dx+dy*dy);
+      if(d<MAX_DIST){
+        const op=(1-d/MAX_DIST)*.18;
+        bgCtx.beginPath();
+        bgCtx.strokeStyle=`hsla(${n.hue},80%,55%,${op})`;
+        bgCtx.lineWidth=.8;
+        bgCtx.moveTo(n.x,n.y);
+        bgCtx.lineTo(m.x,m.y);
+        bgCtx.stroke();
+      }
+    }
+    bgCtx.beginPath();
+    bgCtx.arc(n.x,n.y,n.r,0,Math.PI*2);
+    bgCtx.fillStyle=`hsla(${n.hue},80%,65%,.5)`;
+    bgCtx.fill();
+  }
+  requestAnimationFrame(drawBG);
+}
+drawBG();
+
+/* ═══════════════════════════════════════════════════════════
+   SLIDE ENGINE
+═══════════════════════════════════════════════════════════ */
+const SLIDES=['s1','s2','s3','s4','s5','s6'];
+const DURS=[11000,12000,13000,12000,16000,9000];
+let cur=0,stimer,btimer;
+
+const prog=document.getElementById('prog');
+const wipe=document.getElementById('wipe');
+
+function buildDots(){
+  SLIDES.forEach((_,i)=>{
+    ['dots2','dots3','dots4','dots5'].forEach(id=>{
+      const el=document.getElementById(id);
+      if(!el)return;
+      const d=document.createElement('div');
+      d.className='sdot'+(i===parseInt(id.replace('dots',''))-1?' on':'');
+      el.appendChild(d);
+    });
+  });
+}
+buildDots();
+
+function updateDots(idx){
+  document.querySelectorAll('.sdot').forEach((d,i)=>d.classList.toggle('on',i===idx));
+}
+
+function goTo(idx){
+  // wipe transition
+  wipe.style.transition='transform .35s cubic-bezier(.8,0,.2,1)';
+  wipe.style.transformOrigin='left';
+  wipe.style.transform='scaleX(1)';
+
+  setTimeout(()=>{
+    document.getElementById(SLIDES[cur]).classList.remove('active');
+    cur=idx;
+    document.getElementById(SLIDES[cur]).classList.add('active');
+    updateDots(cur);
+    onEnter(cur);
+
+    wipe.style.transformOrigin='right';
+    wipe.style.transform='scaleX(0)';
+
+    startProg(DURS[cur]);
+  },380);
+}
+
+function next(){goTo((cur+1)%SLIDES.length)}
+
+function startProg(d){
+  prog.style.transition='none';prog.style.width='0%';
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    prog.style.transition=`width ${d}ms linear`;prog.style.width='100%';
+  }));
+  clearTimeout(stimer);
+  stimer=setTimeout(next,d);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SLIDE ANIMATIONS
+═══════════════════════════════════════════════════════════ */
+function onEnter(i){
+  if(i===1)enterMec();
+  if(i===2)enterRobots();
+  if(i===3)enterElec();
+  if(i===4)enterCode();
+  if(i===5)enterClose();
+}
+
+// S2 — Mecánica
+function enterMec(){
+  document.querySelectorAll('.mec-card').forEach(c=>c.classList.remove('in'));
+  document.querySelectorAll('.mec-card').forEach(c=>{
+    setTimeout(()=>c.classList.add('in'),+c.dataset.d+200);
+  });
+}
+
+// S3 — Robots
+function enterRobots(){
+  document.querySelectorAll('.rcard').forEach((c,i)=>{
+    c.classList.remove('in');
+    setTimeout(()=>c.classList.add('in'),150+i*200);
+  });
+}
+
+// S4 — Electrónica: animate components and flow paths
+const COMP_GROUPS=[
+  {g:0,paths:['w-ba'],labels:['lbl-ba'],delay:300},
+  {g:1,paths:['w-al'],labels:['lbl-al'],delay:900},
+  {g:2,paths:['w-ma','w-mb'],labels:[],delay:1500},
+  {g:3,paths:['w-as'],labels:['lbl-as'],delay:2100},
+  {g:4,paths:['w-av'],labels:['lbl-av'],delay:2700},
+];
+
+function enterElec(){
+  // Reset
+  document.querySelectorAll('.comp-box').forEach(c=>c.classList.remove('lit'));
+  document.querySelectorAll('.flow-path').forEach(p=>{p.classList.remove('on');p.style.opacity=0});
+  document.querySelectorAll('.el-row').forEach(c=>c.classList.remove('in'));
+  document.querySelectorAll('[id^="lbl-"]').forEach(l=>l.setAttribute('opacity','0'));
+
+  COMP_GROUPS.forEach(({g,paths,labels,delay})=>{
+    setTimeout(()=>{
+      document.querySelectorAll(`.comp-box[data-g="${g}"]`).forEach(c=>c.classList.add('lit'));
+      paths.forEach(id=>{
+        const el=document.getElementById(id);
+        if(el){el.classList.add('on');el.style.opacity=1}
+      });
+      labels.forEach(id=>{
+        const el=document.getElementById(id);
+        if(el)el.setAttribute('opacity','1');
+      });
+    },delay);
+  });
+
+  document.querySelectorAll('.el-row').forEach(c=>{
+    setTimeout(()=>c.classList.add('in'),+c.dataset.d+400);
+  });
+}
+
+// S6 — Cierre
+function enterClose(){}
+
+/* ═══════════════════════════════════════════════════════════
+   SLIDE 5 — ROBOT SIMULATION + BLOCK ANIMATION
+═══════════════════════════════════════════════════════════ */
+const rCanvas=document.getElementById('robot-canvas');
+const rCtx=rCanvas.getContext('2d');
+const BLOCK_COUNT=6;
+const BLOCK_DUR=2200;
+
+// Robot sim state machine
+const SIM={
+  x:80, y:130,
+  angle:-Math.PI/2, // facing up
+  state:'move', // move | sensing | danger | retro | turn | free
+  stateT:0,
+  dist:99,
+  wallY:42,
+  wallX:null,
+  turnDir:1,
+  turnAmt:0,
+};
+
+const STATE_SEQ=['init','measure','check','retro','turn','move'];
+let simFrame=0;
+
+function drawSim(){
+  const W=rCanvas.width, H=rCanvas.height;
+  rCtx.clearRect(0,0,W,H);
+
+  // Background
+  rCtx.fillStyle='rgba(5,12,26,.95)';
+  rCtx.fillRect(0,0,W,H);
+
+  // Grid
+  rCtx.strokeStyle='rgba(245,166,35,.06)';
+  rCtx.lineWidth=.5;
+  for(let x=0;x<W;x+=20){rCtx.beginPath();rCtx.moveTo(x,0);rCtx.lineTo(x,H);rCtx.stroke()}
+  for(let y=0;y<H;y+=20){rCtx.beginPath();rCtx.moveTo(0,y);rCtx.lineTo(W,y);rCtx.stroke()}
+
+  // Walls
+  rCtx.fillStyle='rgba(30,58,138,.7)';
+  rCtx.strokeStyle='rgba(0,229,255,.4)';
+  rCtx.lineWidth=1.5;
+  // Top wall
+  rCtx.fillRect(20,SIM.wallY,W-40,12);
+  rCtx.strokeRect(20,SIM.wallY,W-40,12);
+  // Side walls
+  rCtx.fillRect(20,SIM.wallY,12,H-SIM.wallY-20);
+  rCtx.strokeRect(20,SIM.wallY,12,H-SIM.wallY-20);
+  rCtx.fillRect(W-32,SIM.wallY,12,H-SIM.wallY-20);
+  rCtx.strokeRect(W-32,SIM.wallY,12,H-SIM.wallY-20);
+
+  // Sensor beam
+  const dist=SIM.dist;
+  const bx=SIM.x+Math.cos(SIM.angle)*dist;
+  const by=SIM.y+Math.sin(SIM.angle)*dist;
+
+  if(SIM.state==='measure'||SIM.state==='check'){
+    const beamGrad=rCtx.createLinearGradient(SIM.x,SIM.y,bx,by);
+    beamGrad.addColorStop(0,'rgba(0,229,255,.6)');
+    beamGrad.addColorStop(1,'rgba(0,229,255,0)');
+    rCtx.beginPath();
+    rCtx.strokeStyle=beamGrad;
+    rCtx.lineWidth=2;
+    rCtx.moveTo(SIM.x,SIM.y);
+    rCtx.lineTo(bx,by);
+    rCtx.stroke();
+    // Beam dot
+    rCtx.beginPath();
+    rCtx.arc(bx,by,3,0,Math.PI*2);
+    rCtx.fillStyle=dist<30?'rgba(255,61,61,.9)':'rgba(0,229,255,.9)';
+    rCtx.fill();
+  }
+
+  // Robot body
+  rCtx.save();
+  rCtx.translate(SIM.x,SIM.y);
+  rCtx.rotate(SIM.angle+Math.PI/2);
+
+  // Wheels
+  [[-10,-14],[10,-14],[-10,8],[10,8]].forEach(([wx,wy])=>{
+    rCtx.fillStyle='#2a3a5a';
+    rCtx.fillRect(wx-3,wy-5,6,10);
+  });
+  // Body
+  const bodyCol=SIM.state==='danger'?'#ff3d3d':SIM.state==='retro'?'#ff8c00':SIM.state==='move'||SIM.state==='free'?'#f5a623':'#00e5ff';
+  rCtx.fillStyle=bodyCol;
+  rCtx.shadowColor=bodyCol;
+  rCtx.shadowBlur=12;
+  rCtx.fillRect(-10,-12,20,22);
+  // Sensor (front)
+  rCtx.fillStyle='#00e5ff';
+  rCtx.shadowColor='#00e5ff';
+  rCtx.shadowBlur=8;
+  rCtx.fillRect(-5,-16,10,6);
+  // Direction arrow
+  rCtx.fillStyle='rgba(255,255,255,.7)';
+  rCtx.shadowBlur=0;
+  rCtx.beginPath();rCtx.moveTo(0,-18);rCtx.lineTo(-4,-13);rCtx.lineTo(4,-13);rCtx.closePath();rCtx.fill();
+
+  rCtx.restore();
+
+  // Distance label
+  rCtx.font='bold 9px monospace';
+  rCtx.fillStyle=dist<20?'#ff3d3d':'#00e5ff';
+  rCtx.fillText(`${Math.round(dist)}cm`,SIM.x+14,SIM.y-2);
+}
+
+// Simulation update
+function updateSim(blockIdx){
+  const t=simFrame*0.016;
+  switch(blockIdx){
+    case 0: // init
+      SIM.state='init';SIM.x=80;SIM.y=130;SIM.angle=-Math.PI/2;SIM.dist=99;
+      break;
+    case 1: // measure
+      SIM.state='measure';
+      SIM.dist=Math.max(10,SIM.wallY+12-SIM.y+ (Math.sin(t*4)*3));
+      SIM.dist=Math.min(SIM.dist,120);
+      break;
+    case 2: // check
+      SIM.state='check';
+      SIM.dist=15+Math.sin(t*2)*2;
+      break;
+    case 3: // retro
+      SIM.state='retro';
+      SIM.y=Math.min(140,SIM.y+.8);
+      SIM.dist=Math.min(SIM.dist+.3,60);
+      break;
+    case 4: // turn
+      SIM.state='turn';
+      SIM.angle+=-0.025;
+      SIM.dist=40+Math.sin(SIM.angle*3)*10;
+      break;
+    case 5: // free/move
+      SIM.state='move';
+      SIM.x+=Math.cos(SIM.angle)*.8;
+      SIM.y+=Math.sin(SIM.angle)*.8;
+      SIM.x=Math.max(38,Math.min(122,SIM.x));
+      SIM.y=Math.max(SIM.wallY+28,Math.min(148,SIM.y));
+      SIM.dist=Math.min(SIM.y-SIM.wallY-12,120);
+      break;
+  }
+  simFrame++;
+  drawSim();
+}
+
+const STATUS_TEXT=['INICIALIZANDO...','MIDIENDO DISTANCIA...','⚠ OBSTÁCULO DETECTADO!','↩ RETROCEDIENDO...','↻ GIRANDO...','✓ AVANZANDO LIBRE'];
+const STATUS_COLOR=['#00e5ff','#00e5ff','#ff3d3d','#ff8c00','#a855f7','#00e676'];
+
+// Block animation
+let blkCur=-1, blkTimer=null, simInterval=null;
+
+function enterCode(){
+  clearInterval(btimer);
+  clearInterval(simInterval);
+  for(let i=0;i<BLOCK_COUNT;i++){
+    document.getElementById('v'+i)?.classList.remove('on');
+    document.getElementById('c'+i)?.classList.remove('on');
+  }
+  blkCur=-1;
+  simFrame=0;
+  stepBlock();
+  btimer=setInterval(stepBlock,BLOCK_DUR);
+}
+
+function stepBlock(){
+  if(blkCur>=0){
+    document.getElementById('v'+blkCur)?.classList.remove('on');
+    document.getElementById('c'+blkCur)?.classList.remove('on');
+  }
+  blkCur=(blkCur+1)%BLOCK_COUNT;
+
+  document.getElementById('v'+blkCur)?.classList.add('on');
+  document.getElementById('c'+blkCur)?.classList.add('on');
+
+  // Status
+  const st=document.getElementById('sim-status');
+  if(st){st.textContent=STATUS_TEXT[blkCur];st.style.color=STATUS_COLOR[blkCur]}
+
+  // Move rail dot
+  const vEl=document.getElementById('v'+blkCur);
+  const dotEl=document.getElementById('rdot');
+  if(vEl&&dotEl){
+    const vR=vEl.getBoundingClientRect();
+    const railEl=dotEl.parentElement;
+    const rR=railEl.getBoundingClientRect();
+    dotEl.style.top=(vR.top-rR.top+vR.height/2-5)+'px';
+  }
+
+  // Sim
+  clearInterval(simInterval);
+  simFrame=0;
+  const bi=blkCur;
+  simInterval=setInterval(()=>updateSim(bi),16);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   START
+═══════════════════════════════════════════════════════════ */
+onEnter(0);
+startProg(DURS[0]);
+
+// Click/tap to advance
+document.addEventListener('click',()=>{clearTimeout(stimer);clearInterval(btimer);clearInterval(simInterval);next()});
+
+// Keyboard support
+document.addEventListener('keydown',e=>{
+  if(e.key==='ArrowRight'||e.key===' '){clearTimeout(stimer);clearInterval(btimer);clearInterval(simInterval);next()}
+  if(e.key==='ArrowLeft'){clearTimeout(stimer);clearInterval(btimer);clearInterval(simInterval);goTo((cur-1+SLIDES.length)%SLIDES.length)}
+  if(e.key==='f'||e.key==='F'){document.documentElement.requestFullscreen?.()}
+});
+</script>
+</body>
+</html>
